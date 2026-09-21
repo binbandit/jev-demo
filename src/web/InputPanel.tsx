@@ -1,21 +1,19 @@
-import { type DemoInput, type Mode, presets } from "@/catalog";
+import { type DemoInput, presets } from "@/catalog";
 import { DiffInput } from "@/web/DiffInput";
 
 type Props = {
   input: DemoInput;
-  mode: Mode;
   pending: boolean;
   ready: boolean;
   onChange: (input: DemoInput) => void;
   onRun: () => void;
 };
 
-export function InputPanel({ input, mode, pending, ready, onChange, onRun }: Props) {
+export function InputPanel({ input, pending, ready, onChange, onRun }: Props) {
   const options = presets[input.demo];
   const selected = options.findIndex(
     (preset) => JSON.stringify(preset.input) === JSON.stringify(input),
   );
-  const recorded = mode === "recorded";
   const valid =
     input.demo === "customer" ? input.interactions.trim() : input.title.trim() && input.diff.trim();
 
@@ -53,7 +51,7 @@ export function InputPanel({ input, mode, pending, ready, onChange, onRun }: Pro
             </select>
           </label>
           <button type="submit" className="primary" disabled={!ready || !valid || pending}>
-            {pending ? "Running…" : recorded ? "Replay" : "Run example"}
+            {pending ? "Running…" : "Run example"}
           </button>
         </div>
 
@@ -64,7 +62,6 @@ export function InputPanel({ input, mode, pending, ready, onChange, onRun }: Pro
               id="interactions"
               className="context-input"
               value={input.interactions}
-              readOnly={recorded}
               maxLength={12000}
               spellCheck={false}
               onChange={(event) => onChange({ ...input, interactions: event.target.value })}
@@ -77,23 +74,14 @@ export function InputPanel({ input, mode, pending, ready, onChange, onRun }: Pro
               <input
                 id="pr-title"
                 value={input.title}
-                readOnly={recorded}
                 maxLength={12000}
                 onChange={(event) => onChange({ ...input, title: event.target.value })}
               />
             </label>
-            <DiffInput
-              value={input.diff}
-              readOnly={recorded}
-              onChange={(diff) => onChange({ ...input, diff })}
-            />
+            <DiffInput value={input.diff} onChange={(diff) => onChange({ ...input, diff })} />
           </>
         )}
-        <p className="hint">
-          {recorded
-            ? "Recorded inputs are read-only. Switch to Live to edit."
-            : "Edit the input and run again to compare the judgments."}
-        </p>
+        <p className="hint">Edit the input and run again to compare the judgments.</p>
       </form>
     </section>
   );

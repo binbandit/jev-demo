@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { type DemoInput, type Mode, presets } from "@/catalog";
+import { type DemoInput, presets } from "@/catalog";
 import type { ComparisonResult, ComparisonUpdate } from "@/compare";
 import "@/web/Comparison.css";
 
 type Props = {
   input: DemoInput;
-  mode: Mode;
   jevAvailable: boolean;
   llmAvailable: boolean;
   llmModel: string | null;
@@ -145,7 +144,7 @@ function LlmAnswer({ attempt }: { attempt: ComparisonResult["llm"] }) {
   );
 }
 
-export function Comparison({ input, mode, jevAvailable, llmAvailable, llmModel }: Props) {
+export function Comparison({ input, jevAvailable, llmAvailable, llmModel }: Props) {
   const [result, setResult] = useState<Partial<ComparisonResult>>({});
   const [pending, setPending] = useState(false);
   const request = useRef<AbortController | null>(null);
@@ -155,13 +154,11 @@ export function Comparison({ input, mode, jevAvailable, llmAvailable, llmModel }
   const valid =
     input.demo === "customer" ? input.interactions.trim() : input.title.trim() && input.diff.trim();
   const disabledReason =
-    mode !== "live"
-      ? "Switch to Live mode to compare real model calls."
-      : !jevAvailable || !llmAvailable
-        ? "Both Jev and OpenAI must be configured on the server to run this comparison."
-        : !valid
-          ? "Enter an input in the Demo view first."
-          : null;
+    !jevAvailable || !llmAvailable
+      ? "Both Jev and OpenAI must be configured on the server to run this comparison."
+      : !valid
+        ? "Enter an input in the Demo view first."
+        : null;
 
   useEffect(
     () => () => {

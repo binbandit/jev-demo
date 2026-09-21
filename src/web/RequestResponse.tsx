@@ -13,7 +13,7 @@ export function RequestResponse({ result }: { result: DemoRun | null }) {
       <section className="pane" aria-labelledby="request-heading">
         <div className="pane-heading">
           <h2 id="request-heading">Request</h2>
-          <span>{result.source === "recorded" ? "Captured payload" : "Actual SDK payload"}</span>
+          <span>Actual SDK payload</span>
         </div>
         <p className="endpoint">
           <code>POST https://api.typesafe.ai/v1/systemone</code>

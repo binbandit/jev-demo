@@ -9,8 +9,7 @@
     "check": "tsc --noEmit && biome check .",
     "format": "biome check --write .",
     "test": "bun test",
-    "build": "bun build ./src/web/index.html --outdir=dist --minify",
-    "record": "bun src/record.ts"
+    "build": "bun build ./src/web/index.html --outdir=dist --minify"
   },
   "dependencies": {
     "@typesafe-ai/sdk": "^0.6.0",

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { type DemoId, type DemoInput, type Mode, presets } from "@/catalog";
+import { type DemoId, type DemoInput, presets } from "@/catalog";
 import { CodeWalkthrough } from "@/web/CodeWalkthrough";
 import { Comparison } from "@/web/Comparison";
 import { InputPanel } from "@/web/InputPanel";
@@ -71,30 +71,26 @@ export function App() {
       </div>
 
       <div className="session-bar">
-        <code>{demo.config?.model ?? "Loading configuration…"}</code>
+        <code>
+          {demo.config?.model ??
+            (demo.configError ? "Configuration unavailable" : "Loading configuration…")}
+        </code>
         <span>One question per request</span>
-        <label htmlFor="mode">
-          Mode{" "}
-          <select
-            id="mode"
-            value={demo.mode}
-            disabled={!demo.config}
-            onChange={(event) => {
-              setThreshold(0.8);
-              demo.changeMode(event.target.value as Mode);
-            }}
-          >
-            <option value="live" disabled={!demo.config?.liveAvailable}>
-              Live
-            </option>
-            <option value="recorded">Recorded</option>
-          </select>
-        </label>
       </div>
-      {demo.mode === "recorded" ? (
-        <p className="notice">
-          Replaying real saved responses for the preset inputs. No model call is made.
-        </p>
+      {demo.configError ? (
+        <div className="notice" role="alert">
+          <span>{demo.configError}</span>
+          <button type="button" onClick={demo.retryConfig}>
+            Retry connection
+          </button>
+        </div>
+      ) : demo.config && !demo.config.liveAvailable ? (
+        <div className="notice">
+          <span>Add TYPESAFE_API_KEY to .env and restart the server to run examples.</span>
+          <button type="button" onClick={demo.retryConfig}>
+            Recheck configuration
+          </button>
+        </div>
       ) : null}
 
       <main>
@@ -102,9 +98,8 @@ export function App() {
           <div className="workspace">
             <InputPanel
               input={demo.input}
-              mode={demo.mode}
               pending={demo.pending}
-              ready={demo.config !== null}
+              ready={demo.config?.liveAvailable ?? false}
               onChange={changeInput}
               onRun={() => void demo.execute()}
             />
@@ -123,9 +118,8 @@ export function App() {
         ) : null}
         <div hidden={view !== "about"}>
           <Comparison
-            key={`${demo.mode}:${JSON.stringify(demo.input)}`}
+            key={JSON.stringify(demo.input)}
             input={demo.input}
-            mode={demo.mode}
             jevAvailable={demo.config?.liveAvailable ?? false}
             llmAvailable={demo.config?.openaiAvailable ?? false}
             llmModel={demo.config?.openaiModel ?? null}
@@ -140,23 +134,18 @@ export function App() {
           </span>
         ) : demo.result ? (
           <>
-            <span>{demo.result.source === "live" ? "Live response" : "Recorded response"}</span>
+            <span>Live response</span>
             <span>{demo.result.response.model}</span>
-            <span>
-              {demo.result.elapsedMs} ms
-              {demo.result.source === "recorded" ? " at capture" : " request time"}
-            </span>
+            <span>{demo.result.elapsedMs} ms request time</span>
             <span>
               {demo.result.response.usage.input_tokens} input /{" "}
               {demo.result.response.usage.output_tokens} output tokens
             </span>
-            {demo.result.source === "recorded" ? (
-              <span>Captured {new Date(demo.result.capturedAt).toLocaleString()}</span>
-            ) : null}
           </>
         ) : (
           <span>
-            Fictional customer logs and example diffs. Live mode sends the input to TypeSafe.
+            Fictional customer logs and example diffs. Running an example sends the input to
+            TypeSafe.
           </span>
         )}
       </footer>

@@ -6,10 +6,9 @@ export const inputSchema = z.discriminatedUnion("demo", [
   z.object({ demo: z.literal("pull-request"), title: text, diff: text }),
 ]);
 
-export const runSchema = z.object({ mode: z.enum(["live", "recorded"]), input: inputSchema });
+export const runSchema = z.strictObject({ input: inputSchema });
 export type DemoInput = z.infer<typeof inputSchema>;
 export type DemoId = DemoInput["demo"];
-export type Mode = z.infer<typeof runSchema>["mode"];
 
 export const presets = {
   customer: [

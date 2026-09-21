@@ -30,9 +30,11 @@ For the live comparison, also set these in `.env` or the environment:
 
 There are no separate `PORTKEY_*` variables. Use a model route that supports strict structured outputs. Restart after changing configuration. See [Portkey's Universal API](https://portkey.ai/docs/product/ai-gateway/universal-api).
 
-Choose a scenario, then **Run example**. Use **Demo** for the input and result, **Request / response** for the JSON, **Source** to select the Jev example or OpenAI adapter, and **Jev vs LLM** to run both models. PR diffs are highlighted; **Edit diff** / **View diff** switches between editing and viewing in Live mode.
+Choose a scenario, then **Run example**. Use **Demo** for the input and result, **Request / response** for the JSON, **Source** to select the Jev example or OpenAI adapter, and **Jev vs LLM** to run both models. PR diffs are highlighted; **Edit diff** / **View diff** switches between editing and viewing.
 
-**Recorded** mode replays actual Jev API results without a key. Results identify their mode, model, and capture time. There is no automatic fallback from live to recorded. Recordings cover the included scenarios; edited inputs and the two-model comparison require live requests.
+All examples make live requests and require `TYPESAFE_API_KEY`. Results show the model, request time, and token usage. The two-model comparison also requires the OpenAI configuration above.
+
+Set up `.env` on each device running the server; Git does not copy API keys. If configuration cannot load, use **Retry connection**. After adding a missing key and restarting the server, use **Recheck configuration**.
 
 Start with **Replace a card**, then **Rename a response field**. The [presenter guide](docs/presenter.md) covers the 15-minute walkthrough.
 
@@ -59,7 +61,6 @@ Changing the PR threshold reuses the existing answer without another request. Cu
 | [src/compare.ts](src/compare.ts) | Run one model call and retain its request, response, and timing. |
 | [src/client.ts](src/client.ts) | Model selection and server-side SDK configuration. |
 | [src/catalog.ts](src/catalog.ts) | The fictional inputs and scenario definitions. |
-| [src/recordings.json](src/recordings.json) | The captured results for Recorded mode. |
 
 Request builders define the evidence and questions once for both integrations. The Jev functions pass that object to `client.systemOne(request)` and return `{ request, response }`. **Request / response** shows the actual SDK input, including `model`, `state`, and `questions`, alongside its response. The API key stays on the server.
 
@@ -93,12 +94,11 @@ The terminal commands make live requests. Scenario numbers are `1`, `2`, or `3` 
 | Command | Purpose |
 | --- | --- |
 | `bun dev` | Start the demo with automatic reload. |
-| `bun run record` | Call the API for all six scenarios and replace the saved recordings. |
 | `bun run check` | Check types and code style. |
 | `bun test` | Run the local tests without an API key. |
 | `bun run build` | Verify the browser bundle. |
 | `bun start` | Run the Bun server in production mode. |
 
-A build is not required before starting the server. Refresh recordings after changing the questions or scenarios, then rehearse before presenting. Live probabilities and elapsed times can vary.
+A build is not required before starting the server. Rehearse after changing the questions or scenarios and before presenting. Live probabilities and elapsed times can vary.
 
 All fixtures are fictional. Live Jev requests send inputs to TypeSafe; the comparison also sends them through Portkey to the configured model. Keys stay on the server. The demo does not connect to bank systems or apply GitHub labels. Customer labels describe contact reasons, not eligibility or risk.

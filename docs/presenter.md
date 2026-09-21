@@ -6,7 +6,6 @@ Two examples, one question each. Show the input, request, response, and source, 
 
 - Run `bun install`. Configure `TYPESAFE_API_KEY`, `OPENAI_URL`, `OPENAI_MODEL`, and `OPENAI_API_KEY` in `.env`, then start `bun dev`. The `OPENAI_*` settings point to Portkey; preserve the full model route. See the [setup instructions](../README.md#run-it).
 - Open [localhost:3000](http://localhost:3000). Rehearse **Replace a card** and **Rename a response field**, including **Run both models**. Confirm your Portkey model supports strict structured outputs.
-- Check Recorded mode too. It replays Jev results only; the comparison is always live.
 - Open `src/examples/customer.ts`, `src/examples/pull-request.ts`, and `src/openai.ts` in your editor. Increase the font size for the room.
 - Keep a terminal ready using the commands at the end.
 
@@ -64,9 +63,9 @@ Keep server setup and interface code out of the walkthrough. If editing a PR, us
 
 ## If something goes wrong
 
-**Jev API unavailable:** select Recorded mode and the same scenario. Say: “This is an actual Jev result saved at the time shown.” You can inspect its source, request, response, and threshold. Edited inputs and the comparison need live requests.
+**Jev API unavailable:** check the server configuration and retry. If the request still fails, walk through the source and input without presenting a model result. All examples require live requests.
 
-**Portkey unavailable:** continue with the Jev example and inspect `src/openai.ts`. Say the comparison did not complete; do not present a recording as a live two-model comparison.
+**Portkey unavailable:** continue with the Jev example and inspect `src/openai.ts`. Say the comparison did not complete.
 
 **Browser unavailable:** use the live terminal path:
 

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { type DemoInput, type Mode, presets } from "@/catalog";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { type DemoInput, presets } from "@/catalog";
 import type { DemoRun } from "@/run";
 
 type Config = {
@@ -11,43 +11,44 @@ type Config = {
 
 export function useDemo() {
   const [config, setConfig] = useState<Config | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
   const [input, setInput] = useState<DemoInput>(
     presets.customer[0]?.input ?? { demo: "customer", interactions: "" },
   );
-  const [mode, setMode] = useState<Mode>("recorded");
   const [result, setResult] = useState<DemoRun | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const request = useRef<AbortController | null>(null);
+  const configRequest = useRef<AbortController | null>(null);
+
+  const retryConfig = useCallback(async () => {
+    configRequest.current?.abort();
+    const controller = new AbortController();
+    configRequest.current = controller;
+    setConfig(null);
+    setConfigError(null);
+    try {
+      const response = await fetch("/api/config", { signal: controller.signal, cache: "no-store" });
+      if (!response.ok) throw new Error("Could not load the demo configuration.");
+      const next = (await response.json()) as Config;
+      if (controller.signal.aborted) return;
+      setConfig(next);
+    } catch {
+      if (controller.signal.aborted) return;
+      setConfigError(
+        "Could not load the demo configuration. Check the server connection and retry.",
+      );
+    }
+  }, []);
 
   useEffect(() => {
-    const controller = new AbortController();
-    async function loadConfig() {
-      try {
-        const response = await fetch("/api/config", { signal: controller.signal });
-        if (!response.ok) throw new Error("Could not load the demo configuration.");
-        const next = (await response.json()) as Config;
-        if (controller.signal.aborted) return;
-        setConfig(next);
-        setMode(next.liveAvailable ? "live" : "recorded");
-      } catch (cause) {
-        if (controller.signal.aborted) return;
-        setConfig({
-          liveAvailable: false,
-          model: "Jev",
-          openaiAvailable: false,
-          openaiModel: null,
-        });
-        setError(cause instanceof Error ? cause.message : "Could not connect to the demo server.");
-      }
-    }
-    void loadConfig();
+    void retryConfig();
     return () => {
-      controller.abort();
+      configRequest.current?.abort();
       request.current?.abort();
       request.current = null;
     };
-  }, []);
+  }, [retryConfig]);
 
   function clearResult() {
     request.current?.abort();
@@ -62,19 +63,6 @@ export function useDemo() {
     setInput(next);
   }
 
-  function changeMode(next: Mode) {
-    clearResult();
-    setMode(next);
-    if (next === "recorded") {
-      const options = presets[input.demo];
-      const match = options.find(
-        (preset) => JSON.stringify(preset.input) === JSON.stringify(input),
-      );
-      const preset = match ?? options[0];
-      if (preset) setInput(preset.input);
-    }
-  }
-
   async function execute() {
     clearResult();
     const controller = new AbortController();
@@ -84,7 +72,7 @@ export function useDemo() {
       const response = await fetch("/api/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode, input }),
+        body: JSON.stringify({ input }),
         signal: controller.signal,
       });
       const payload = (await response.json()) as DemoRun | { error: string };
@@ -105,5 +93,5 @@ export function useDemo() {
     }
   }
 
-  return { config, input, mode, result, pending, error, changeInput, changeMode, execute };
+  return { config, configError, retryConfig, input, result, pending, error, changeInput, execute };
 }

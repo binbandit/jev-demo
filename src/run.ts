@@ -19,9 +19,5 @@ export async function runDemo(client: TypeSafeClient, input: DemoInput) {
 
 export type DemoResult = Awaited<ReturnType<typeof runDemo>>;
 export type DemoRun = DemoResult & {
-  source: "live" | "recorded";
   elapsedMs: number;
-  capturedAt: string;
 };
-
-export type Recording = { input: DemoInput; result: DemoRun };

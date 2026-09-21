@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import "@/web/DiffInput.css";
 
-type Props = { value: string; onChange: (value: string) => void; readOnly: boolean };
+type Props = { value: string; onChange: (value: string) => void };
 
 function lineType(line: string) {
   if (/^(diff |index |--- |\+\+\+ |new file |deleted file |rename |similarity )/.test(line)) {
@@ -13,28 +13,25 @@ function lineType(line: string) {
   return "context";
 }
 
-export function DiffInput({ value, onChange, readOnly }: Props) {
+export function DiffInput({ value, onChange }: Props) {
   const [editing, setEditing] = useState(false);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const labelId = useId();
   const contentId = useId();
-  const isEditing = editing && !readOnly;
 
   useEffect(() => {
-    if (isEditing) textarea.current?.focus();
-  }, [isEditing]);
+    if (editing) textarea.current?.focus();
+  }, [editing]);
 
   return (
     <div className="field diff-field">
       <div className="diff-heading">
         <span id={labelId}>Diff</span>
-        {!readOnly ? (
-          <button type="button" aria-controls={contentId} onClick={() => setEditing(!editing)}>
-            {isEditing ? "View diff" : "Edit diff"}
-          </button>
-        ) : null}
+        <button type="button" aria-controls={contentId} onClick={() => setEditing(!editing)}>
+          {editing ? "View diff" : "Edit diff"}
+        </button>
       </div>
-      {isEditing ? (
+      {editing ? (
         <textarea
           id={contentId}
           ref={textarea}

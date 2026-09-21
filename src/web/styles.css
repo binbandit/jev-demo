@@ -141,16 +141,11 @@ h3 {
   color: var(--muted);
   border-bottom: 1px solid var(--border);
 }
-.session-bar label {
+.notice {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-left: auto;
-}
-.session-bar select {
-  padding: 4px 24px 4px 8px;
-}
-.notice {
+  flex-wrap: wrap;
+  gap: 12px;
   padding: 10px 28px;
   background: #fff8c5;
   border-bottom: 1px solid #d4c870;

@@ -4,18 +4,13 @@ import { handleRun } from "@/api";
 import { type DemoInput, runSchema } from "@/catalog";
 import type { CustomerResponse } from "@/examples/customer";
 import { pullRequestLabels } from "@/examples/pull-request";
-import savedRecordings from "@/recordings.json";
-import { type Recording, runDemo } from "@/run";
+import { runDemo } from "@/run";
+import { customerResponse, pullRequestResponse } from "./fixtures";
 
-const recordings = savedRecordings as Recording[];
-const customer = recordings.find(({ result }) => result.demo === "customer");
-const pullRequest = recordings.find(({ result }) => result.demo === "pull-request");
-if (customer?.result.demo !== "customer" || pullRequest?.result.demo !== "pull-request") {
-  throw new Error("The demo needs a recording of each example.");
-}
-const customerResponse = customer.result.response;
-const customerRequest = customer.result.request;
-const pullRequestResponse = pullRequest.result.response;
+const customerInput: DemoInput = {
+  demo: "customer",
+  interactions: "My card is damaged. Please send a replacement.",
+};
 
 function sdkReturning(body: unknown, status = 200) {
   const requests: SystemOneRequestPayload[] = [];
@@ -61,9 +56,9 @@ describe("model requests", () => {
     expectTypeOf<CustomerResponse["answers"]["reason"]["choice"]>().toEqualTypeOf<
       "card_replacement" | "payment_query" | "online_banking" | "other"
     >();
-    expect(customerRequest.questions.reason.criteria).toHaveProperty(
-      customerResponse.answers.reason.choice,
-    );
+    expect(
+      result.demo === "customer" ? result.request.questions.reason.criteria : {},
+    ).toHaveProperty(customerResponse.answers.reason.choice);
   });
 
   test("PR classification sends one Noul and exposes the exact request", async () => {
@@ -101,29 +96,20 @@ describe("label policy", () => {
 });
 
 describe("run endpoint", () => {
-  test.each(recordings)("replays an exact saved input without an API key", async (recording) => {
-    const response = await handleRun(request({ mode: "recorded", input: recording.input }), null);
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ ...recording.result, source: "recorded" });
-  });
-
-  test("edited input cannot silently use an unrelated recording", async () => {
-    const input = { demo: "customer", interactions: "A new interaction with no saved result." };
-    const response = await handleRun(request({ mode: "recorded", input }), null);
-    expect(response.status).toBe(409);
-  });
-
-  test("live mode requires a key even when its input has a recording", async () => {
-    const response = await handleRun(request({ mode: "live", input: customer.input }), null);
+  test("running an example requires an API key", async () => {
+    const response = await handleRun(request({ input: customerInput }), null);
     expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: "Add TYPESAFE_API_KEY to .env and restart the server.",
+    });
   });
 
-  test("live success includes the actual request, typed answers, and live source", async () => {
+  test("live success includes the actual request, typed answers, and elapsed time", async () => {
     const { client, requests } = sdkReturning(customerResponse);
-    const response = await handleRun(request({ mode: "live", input: customer.input }), client);
+    const response = await handleRun(request({ input: customerInput }), client);
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      source: "live",
+      elapsedMs: expect.any(Number),
       request: requests[0],
       response: customerResponse,
     });
@@ -132,10 +118,10 @@ describe("run endpoint", () => {
 
   test.each([
     null,
-    { mode: "live", input: { demo: "customer", interactions: "   " } },
-    { mode: "live", input: { demo: "pull-request", title: "Missing diff" } },
-    { mode: "live", input: { demo: "customer", interactions: "x".repeat(20_001) } },
-    { mode: "unknown", input: customer.input },
+    { input: { demo: "customer", interactions: "   " } },
+    { input: { demo: "pull-request", title: "Missing diff" } },
+    { input: { demo: "customer", interactions: "x".repeat(20_001) } },
+    { mode: "recorded", input: customerInput },
   ])("rejects invalid input before making a model request", async (body) => {
     const { client, requests } = sdkReturning(customerResponse);
     expect(runSchema.safeParse(body).success).toBe(false);
@@ -152,18 +138,21 @@ describe("run endpoint", () => {
   });
 
   test("only same-origin browser requests can use the endpoint", async () => {
-    const body = { mode: "recorded", input: customer.input };
-    expect((await handleRun(request(body, "https://other.example"), null)).status).toBe(403);
-    expect((await handleRun(request(body, "http://localhost:3000"), null)).status).toBe(200);
+    const body = { input: customerInput };
+    const { client, requests } = sdkReturning(customerResponse);
+    expect((await handleRun(request(body, "https://other.example"), client)).status).toBe(403);
+    expect(requests).toHaveLength(0);
+    expect((await handleRun(request(body, "http://localhost:3000"), client)).status).toBe(200);
+    expect(requests).toHaveLength(1);
   });
 
-  test("upstream failures are sanitized and never replaced with a recording", async () => {
+  test("upstream failures return a sanitized error", async () => {
     const { client, requests } = sdkReturning({ message: "private-upstream-detail" }, 500);
-    const response = await handleRun(request({ mode: "live", input: customer.input }), client);
+    const response = await handleRun(request({ input: customerInput }), client);
     const body = await response.text();
     expect(response.status).toBe(502);
     expect(requests).toHaveLength(1);
     expect(body).not.toContain("private-upstream-detail");
-    expect(body).not.toContain('"source":"recorded"');
+    expect(JSON.parse(body)).toEqual({ error: "The live Jev request failed. Try again." });
   });
 });

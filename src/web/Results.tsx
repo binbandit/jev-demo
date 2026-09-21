@@ -21,7 +21,7 @@ export function Results({ result, pending, error, threshold, onThresholdChange }
     <section className="pane output-pane" aria-labelledby="output-heading" aria-busy={pending}>
       <div className="pane-heading">
         <h2 id="output-heading">Output</h2>
-        <span>{result?.source === "recorded" ? "Recorded SDK response" : "SDK response"}</span>
+        <span>SDK response</span>
       </div>
       <div aria-live="polite">
         {error ? (

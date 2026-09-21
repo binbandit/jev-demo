@@ -10,7 +10,7 @@ import { type ComparisonUpdate, compareModel } from "@/compare";
 import { customerRequest } from "@/examples/customer";
 import { pullRequestRequest } from "@/examples/pull-request";
 import { createOpenAIClient, runOpenAI } from "@/openai";
-import recordings from "@/recordings.json";
+import { customerResponse } from "./fixtures";
 
 const environment = {
   OPENAI_API_KEY: "synthetic-comparison-key",
@@ -20,9 +20,6 @@ const environment = {
 const input: DemoInput = { demo: "customer", interactions: "Please replace my lost card." };
 const customerTask = customerRequest("jev-test-model", input.interactions);
 const prTask = pullRequestRequest("jev-test-model", "Rename a field", "-name\n+fullName");
-const customerResponse = recordings.find(({ result }) => result.demo === "customer")?.result
-  .response;
-if (!customerResponse) throw new Error("A recorded customer response is required.");
 
 function completion(
   content: string | null,
