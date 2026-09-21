@@ -62,9 +62,6 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.comparison-error {
-  margin: 24px 28px;
-}
 .comparison-docs {
   display: flex;
   flex-wrap: wrap;
@@ -98,8 +95,5 @@
   }
   .comparison-docs {
     padding: 20px 18px;
-  }
-  .comparison-error {
-    margin: 20px 18px;
   }
 }

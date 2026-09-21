@@ -6,7 +6,7 @@ import type {
 } from "openai/resources/chat/completions";
 import { handleCompare } from "@/api";
 import type { DemoInput } from "@/catalog";
-import { type ComparisonResult, compareDemo } from "@/compare";
+import { type ComparisonUpdate, compareModel } from "@/compare";
 import { customerRequest } from "@/examples/customer";
 import { pullRequestRequest } from "@/examples/pull-request";
 import { createOpenAIClient, runOpenAI } from "@/openai";
@@ -172,28 +172,70 @@ describe("OpenAI comparison request", () => {
 });
 
 describe("comparison execution", () => {
-  test("starts both providers before waiting for either response", async () => {
-    const gate = Promise.withResolvers<void>();
-    const bothStarted = Promise.withResolvers<boolean>();
-    let started = 0;
-    const beforeReply = () => {
-      if (++started === 2) bothStarted.resolve(true);
-      return gate.promise;
-    };
-    const jev = jevReturning(200, beforeReply);
-    const llm = openAIReturning(completion('{"reason":"card_replacement"}'), 200, beforeReply);
-    const pending = compareDemo(jev.client, llm.config, input);
-    try {
-      expect(await Promise.race([bothStarted.promise, Bun.sleep(1_000).then(() => false)])).toBe(
-        true,
-      );
-    } finally {
-      gate.resolve();
-    }
-    const result = await pending;
-    expect(result.jev.ok).toBe(true);
-    expect(result.llm.ok).toBe(true);
+  test.each(["jev", "llm"] as const)("calls only the selected %s provider", async (provider) => {
+    const jev = jevReturning();
+    const llm = openAIReturning(completion('{"reason":"card_replacement"}'));
+    const update = await compareModel(jev.client, llm.config, input, provider);
+
+    expect(Object.keys(update)).toEqual([provider]);
+    expect(update).toMatchObject({ [provider]: { ok: true } });
+    expect(jev.calls).toHaveLength(provider === "jev" ? 1 : 0);
+    expect(llm.calls).toHaveLength(provider === "llm" ? 1 : 0);
   });
+
+  test.each(["jev", "llm"] as const)(
+    "returns %s immediately while the other response remains held",
+    async (fast) => {
+      const slow = fast === "jev" ? "llm" : "jev";
+      const gates = { jev: Promise.withResolvers<void>(), llm: Promise.withResolvers<void>() };
+      const bothStarted = Promise.withResolvers<boolean>();
+      let started = 0;
+      const beforeReply = (provider: "jev" | "llm") => {
+        if (++started === 2) bothStarted.resolve(true);
+        return gates[provider].promise;
+      };
+      const jev = jevReturning(200, () => beforeReply("jev"));
+      const llm = openAIReturning(completion('{"reason":"card_replacement"}'), 200, () =>
+        beforeReply("llm"),
+      );
+      const pending = {
+        jev: handleCompare(compareRequest({ input, provider: "jev" }), jev.client, llm.config),
+        llm: handleCompare(compareRequest({ input, provider: "llm" }), jev.client, llm.config),
+      };
+      let slowFinished = false;
+      const slowResponse = pending[slow].then((response) => {
+        slowFinished = true;
+        return response;
+      });
+
+      try {
+        expect(await Promise.race([bothStarted.promise, Bun.sleep(1_000).then(() => false)])).toBe(
+          true,
+        );
+        gates[fast].resolve();
+        const response = await Promise.race([pending[fast], Bun.sleep(1_000).then(() => null)]);
+        if (!response) throw new Error("The completed provider waited for the held provider.");
+        const update: ComparisonUpdate = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(Object.keys(update)).toEqual([fast]);
+        expect(update).toMatchObject({ [fast]: { ok: true } });
+        expect(slowFinished).toBe(false);
+        expect(jev.calls).toHaveLength(1);
+        expect(llm.calls).toHaveLength(1);
+      } finally {
+        gates.jev.resolve();
+        gates.llm.resolve();
+        await Promise.all(Object.values(pending));
+      }
+
+      const response = await slowResponse;
+      const update: ComparisonUpdate = await response.json();
+      expect(response.status).toBe(200);
+      expect(Object.keys(update)).toEqual([slow]);
+      expect(update).toMatchObject({ [slow]: { ok: true } });
+    },
+  );
 
   test.each(["jev", "llm"] as const)("keeps the other result when %s fails", async (failed) => {
     const jev = jevReturning(failed === "jev" ? 500 : 200);
@@ -203,16 +245,24 @@ describe("comparison execution", () => {
         : completion('{"reason":"card_replacement"}'),
       failed === "llm" ? 500 : 200,
     );
-    const response = await handleCompare(compareRequest({ input }), jev.client, llm.config);
-    const body: ComparisonResult = await response.json();
+    const successful = failed === "jev" ? "llm" : "jev";
+    const [failedResponse, successfulResponse] = await Promise.all([
+      handleCompare(compareRequest({ input, provider: failed }), jev.client, llm.config),
+      handleCompare(compareRequest({ input, provider: successful }), jev.client, llm.config),
+    ]);
+    const failedUpdate: ComparisonUpdate = await failedResponse.json();
+    const successfulUpdate: ComparisonUpdate = await successfulResponse.json();
 
-    expect(response.status).toBe(200);
-    expect(body[failed]).toMatchObject({ ok: false, error: expect.any(String) });
-    expect(body[failed === "jev" ? "llm" : "jev"]).toMatchObject({ ok: true });
+    expect(failedResponse.status).toBe(200);
+    expect(successfulResponse.status).toBe(200);
+    expect(Object.keys(failedUpdate)).toEqual([failed]);
+    expect(Object.keys(successfulUpdate)).toEqual([successful]);
+    expect(failedUpdate).toMatchObject({ [failed]: { ok: false, error: expect.any(String) } });
+    expect(successfulUpdate).toMatchObject({ [successful]: { ok: true } });
     expect(jev.calls).toHaveLength(1);
     expect(llm.calls).toHaveLength(1);
-    expect(JSON.stringify(body)).not.toContain("private-provider-detail");
-    expect(JSON.stringify(body)).not.toContain(environment.OPENAI_API_KEY);
+    expect(JSON.stringify(failedUpdate)).not.toContain("private-provider-detail");
+    expect(JSON.stringify(failedUpdate)).not.toContain(environment.OPENAI_API_KEY);
   });
 });
 
@@ -223,7 +273,7 @@ describe("comparison endpoint", () => {
       const jev = jevReturning();
       const llm = openAIReturning(completion('{"reason":"other"}'));
       const response = await handleCompare(
-        compareRequest({ input }),
+        compareRequest({ input, provider: missing === "jev" ? "llm" : "jev" }),
         missing === "jev" ? null : jev.client,
         missing === "llm" ? null : llm.config,
       );
@@ -236,8 +286,14 @@ describe("comparison endpoint", () => {
 
   test.each([
     { body: null, origin: undefined, status: 400 },
-    { body: { input: { demo: "customer", interactions: " " } }, origin: undefined, status: 400 },
-    { body: { input }, origin: "https://other.example", status: 403 },
+    {
+      body: { input: { demo: "customer", interactions: " " }, provider: "jev" },
+      origin: undefined,
+      status: 400,
+    },
+    { body: { input }, origin: undefined, status: 400 },
+    { body: { input, provider: "unknown" }, origin: undefined, status: 400 },
+    { body: { input, provider: "jev" }, origin: "https://other.example", status: 403 },
   ])(
     "rejects invalid comparison requests before using either provider",
     async ({ body, origin, status }) => {

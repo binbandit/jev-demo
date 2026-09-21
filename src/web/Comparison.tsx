@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { type DemoInput, type Mode, presets } from "@/catalog";
-import type { ComparisonResult } from "@/compare";
+import type { ComparisonResult, ComparisonUpdate } from "@/compare";
 import "@/web/Comparison.css";
 
 type Props = {
@@ -146,9 +146,8 @@ function LlmAnswer({ attempt }: { attempt: ComparisonResult["llm"] }) {
 }
 
 export function Comparison({ input, mode, jevAvailable, llmAvailable, llmModel }: Props) {
-  const [result, setResult] = useState<ComparisonResult | null>(null);
+  const [result, setResult] = useState<Partial<ComparisonResult>>({});
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const request = useRef<AbortController | null>(null);
   const scenario = presets[input.demo].find(
     (preset) => JSON.stringify(preset.input) === JSON.stringify(input),
@@ -178,29 +177,38 @@ export function Comparison({ input, mode, jevAvailable, llmAvailable, llmModel }
     const controller = new AbortController();
     request.current = controller;
     setPending(true);
-    setResult(null);
-    setError(null);
-    try {
-      const response = await fetch("/api/compare", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input }),
-        signal: controller.signal,
-      });
-      const payload = (await response.json()) as ComparisonResult | { error: string };
-      if (!response.ok || "error" in payload)
-        throw new Error(
-          "error" in payload ? payload.error : `Comparison failed (${response.status}).`,
-        );
-      if (request.current === controller) setResult(payload);
-    } catch (cause) {
-      if (request.current === controller)
-        setError(cause instanceof Error ? cause.message : "The comparison request failed.");
-    } finally {
-      if (request.current === controller) {
-        request.current = null;
-        setPending(false);
-      }
+    setResult({});
+
+    await Promise.all(
+      (["jev", "llm"] as const).map(async (provider) => {
+        let update: ComparisonUpdate;
+        try {
+          const response = await fetch("/api/compare", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ input, provider }),
+            signal: controller.signal,
+          });
+          const payload = (await response.json()) as ComparisonUpdate | { error: string };
+          if (!response.ok || "error" in payload)
+            throw new Error(
+              "error" in payload ? payload.error : `Comparison failed (${response.status}).`,
+            );
+          update = payload;
+        } catch (cause) {
+          const failure = {
+            ok: false as const,
+            error: cause instanceof Error ? cause.message : "The comparison request failed.",
+          };
+          update = provider === "jev" ? { jev: failure } : { llm: failure };
+        }
+        if (request.current === controller) setResult((current) => ({ ...current, ...update }));
+      }),
+    );
+
+    if (request.current === controller) {
+      request.current = null;
+      setPending(false);
     }
   }
 
@@ -214,8 +222,9 @@ export function Comparison({ input, mode, jevAvailable, llmAvailable, llmModel }
           enum or boolean.
         </p>
         <p className="hint">
-          The two calls run concurrently. Times include network and gateway overhead, including
-          Portkey where configured; one run is not a benchmark.
+          Both calls start together. Each result appears as soon as its model finishes. Times
+          include network and gateway overhead, including Portkey where configured; one run is not a
+          benchmark.
         </p>
         <div className="comparison-controls">
           <div>
@@ -230,41 +239,46 @@ export function Comparison({ input, mode, jevAvailable, llmAvailable, llmModel }
             disabled={Boolean(disabledReason) || pending}
             onClick={() => void runComparison()}
           >
-            {pending ? "Running both models…" : "Run both models"}
+            {pending ? "Comparing…" : "Run both models"}
           </button>
         </div>
         {disabledReason ? <p className="hint">{disabledReason}</p> : null}
         <JsonDetails label="Current input from the Demo view" value={input} />
       </header>
-      {error ? (
-        <p className="error comparison-error" role="alert">
-          {error}
-        </p>
-      ) : null}
-      <div className="workspace comparison-results" aria-busy={pending} aria-live="polite">
-        <section className="pane" aria-labelledby="jev-comparison-heading">
+      <div className="workspace comparison-results">
+        <section
+          className="pane"
+          aria-labelledby="jev-comparison-heading"
+          aria-busy={pending && !result.jev}
+          aria-live="polite"
+        >
           <div className="pane-heading">
             <h2 id="jev-comparison-heading">Jev</h2>
             <span>Native typed judgment</span>
           </div>
-          {result ? (
+          {result.jev ? (
             <JevAnswer attempt={result.jev} />
           ) : (
             <p className="empty">
-              {pending ? "Waiting for the comparison…" : "Run both models to see Jev's answer."}
+              {pending ? "Running Jev…" : "Run both models to see Jev's answer."}
             </p>
           )}
         </section>
-        <section className="pane" aria-labelledby="llm-comparison-heading">
+        <section
+          className="pane"
+          aria-labelledby="llm-comparison-heading"
+          aria-busy={pending && !result.llm}
+          aria-live="polite"
+        >
           <div className="pane-heading">
             <h2 id="llm-comparison-heading">OpenAI</h2>
             <span>Generative LLM</span>
           </div>
-          {result ? (
+          {result.llm ? (
             <LlmAnswer attempt={result.llm} />
           ) : (
             <p className="empty">
-              {pending ? "Waiting for the comparison…" : "Run both models to see the LLM's answer."}
+              {pending ? "Running OpenAI…" : "Run both models to see the LLM's answer."}
             </p>
           )}
         </section>

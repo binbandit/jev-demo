@@ -1,7 +1,7 @@
 import { APIError, type TypeSafeClient } from "@typesafe-ai/sdk";
 import { z } from "zod";
 import { inputSchema, runSchema } from "@/catalog";
-import { compareDemo } from "@/compare";
+import { compareModel } from "@/compare";
 import type { OpenAIConfig } from "@/openai";
 import recordings from "@/recordings.json";
 import { runDemo } from "@/run";
@@ -75,7 +75,10 @@ export async function handleCompare(
   client: TypeSafeClient | null,
   openai: OpenAIConfig | null,
 ) {
-  const parsed = await readRequest(request, z.object({ input: inputSchema }));
+  const parsed = await readRequest(
+    request,
+    z.object({ input: inputSchema, provider: z.enum(["jev", "llm"]) }),
+  );
   if (parsed instanceof Response) return parsed;
   if (!client || !openai) {
     return Response.json(
@@ -86,5 +89,5 @@ export async function handleCompare(
       { status: 503 },
     );
   }
-  return Response.json(await compareDemo(client, openai, parsed.input));
+  return Response.json(await compareModel(client, openai, parsed.input, parsed.provider));
 }
