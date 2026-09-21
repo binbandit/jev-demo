@@ -56,7 +56,7 @@ Changing the PR threshold reuses the existing answer without another request. Cu
 | [src/examples/customer.ts](src/examples/customer.ts) | `customerRequest`: state and one `choice` question. `labelCustomer`: the SDK call. |
 | [src/examples/pull-request.ts](src/examples/pull-request.ts) | `pullRequestRequest`: one `noul` question. `pullRequestLabels`: one probability comparison. |
 | [src/openai.ts](src/openai.ts) | Translate the same question into a strict JSON response through Portkey. |
-| [src/compare.ts](src/compare.ts) | Run both models concurrently and retain their requests, responses, and timings. |
+| [src/compare.ts](src/compare.ts) | Run one model call and retain its request, response, and timing. |
 | [src/client.ts](src/client.ts) | Model selection and server-side SDK configuration. |
 | [src/catalog.ts](src/catalog.ts) | The fictional inputs and scenario definitions. |
 | [src/recordings.json](src/recordings.json) | The captured results for Recorded mode. |
@@ -69,7 +69,7 @@ A Noul near `0.5` means uncertainty, not a moderately breaking change. Choice co
 
 ## Compare Jev with OpenAI
 
-Select an example and scenario, open **Jev vs LLM**, then choose **Run both models**. Both live calls start concurrently with the same state, question, and criteria. Inspect each raw request, response, and elapsed time.
+Select an example and scenario, open **Jev vs LLM**, then choose **Run both models**. Both live calls start concurrently with the same state, question, and criteria. Each panel displays its result and elapsed time as soon as that model finishes, while the other keeps running. Inspect either request and response immediately, including when the other model fails.
 
 | Result | Jev | OpenAI through Portkey |
 | --- | --- | --- |

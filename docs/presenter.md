@@ -32,7 +32,7 @@ Jev exposes native decision probabilities. This OpenAI call returns an enum or b
 | 2:00-4:00 | Customer **Replace a card**, **Demo** | Read the fictional contact. Ask which reason the audience expects, then **Run example**. Inspect the selected reason and option probabilities. |
 | 4:00-6:00 | Customer **Source**, then **Request / response** | Read `customerRequest` for the state, question, and criteria, then `labelCustomer` for the SDK call. Match `questions.reason` in the request to `answers.reason.choice` in the response. |
 | 6:00-9:00 | PR **Rename a response field**, **Demo** and **Source** | Inspect the highlighted diff: removing `name` changes the contract. Run once, then read the single `breakingChange` Noul and threshold rule. Moving the threshold reuses the answer. |
-| 9:00-11:00 | PR **Jev vs LLM** | Choose **Run both models**. Explain that calls run concurrently with the same state, question, and criteria. Compare Jev's probability with OpenAI's boolean. |
+| 9:00-11:00 | PR **Jev vs LLM** | Choose **Run both models**. Both calls start together; watch each result appear the moment its model finishes. Compare the measured times, then Jev's probability with OpenAI's boolean. |
 | 11:00-13:00 | Comparison requests, then **Source** > OpenAI adapter | Inspect both raw requests and responses. Show the strict JSON schema in `src/openai.ts`. Note each elapsed time includes network and gateway overhead; this is one observation. |
 | 13:00-15:00 | Questions | “We supplied evidence, asked one focused question, and used the typed result in ordinary code.” Take questions. |
 
@@ -49,7 +49,7 @@ For the PR, change only the concept being introduced: `noul` answers whether the
 
 Both Jev functions return `{ request, response }`, so the workbench can show what went in and what came back. The API key stays on the server. The [JavaScript SDK](https://docs.typesafe.ai/sdk/javascript) documents the call.
 
-For the comparison, `src/openai.ts` uses the shared request builder's question in a prompt and strict schema. `src/compare.ts` runs the two requests concurrently. The adapter preserves `OPENAI_MODEL`, including Portkey routing, and sends `OPENAI_API_KEY` as `x-portkey-api-key`. See [Portkey's Universal API](https://portkey.ai/docs/product/ai-gateway/universal-api).
+For the comparison, `src/openai.ts` uses the shared request builder's question in a prompt and strict schema. The UI starts two independent requests; `src/compare.ts` measures each model call. Each panel updates as its result arrives. The adapter preserves `OPENAI_MODEL`, including Portkey routing, and sends `OPENAI_API_KEY` as `x-portkey-api-key`. See [Portkey's Universal API](https://portkey.ai/docs/product/ai-gateway/universal-api).
 
 Keep server setup and interface code out of the walkthrough. If editing a PR, use **Edit diff**, make the change, then **View diff** and run again. Score and batching are optional discussion topics after the examples.
 
