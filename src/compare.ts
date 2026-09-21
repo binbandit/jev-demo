@@ -2,7 +2,7 @@ import type { TypeSafeClient } from "@typesafe-ai/sdk";
 import type { DemoInput } from "@/catalog";
 import { customerRequest } from "@/examples/customer";
 import { pullRequestRequest } from "@/examples/pull-request";
-import { type OpenAIConfig, type OpenAIResult, runOpenAI } from "@/openai";
+import { CachedComparisonError, type OpenAIConfig, type OpenAIResult, runOpenAI } from "@/openai";
 import { type DemoResult, runDemo } from "@/run";
 
 export type Attempt<T> = { ok: true; result: T; elapsedMs: number } | { ok: false; error: string };
@@ -14,8 +14,8 @@ async function measure<T>(run: () => Promise<T>, error: string): Promise<Attempt
   const started = performance.now();
   try {
     return { ok: true, result: await run(), elapsedMs: Math.round(performance.now() - started) };
-  } catch {
-    return { ok: false, error };
+  } catch (cause) {
+    return { ok: false, error: cause instanceof CachedComparisonError ? cause.message : error };
   }
 }
 

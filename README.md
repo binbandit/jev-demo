@@ -79,6 +79,8 @@ Select an example and scenario, open **Jev vs LLM**, then choose **Run both mode
 
 The OpenAI adapter uses [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs), so both sides return constrained values. It does not request or invent an OpenAI confidence score. Jev specializes in decisions with native probabilities; generative LLMs can also classify, use structured outputs, and perform broader generation and reasoning. See [System One](https://docs.typesafe.ai/concepts/system-one).
 
+Every OpenAI comparison requests a fresh response using [Portkey's force-refresh header](https://portkey.ai/docs/product/ai-gateway/cache-simple-and-semantic#force-refresh) and `Cache-Control: no-store`. Each call also uses a unique prompt prefix and `prompt_cache_key` to avoid reusing an earlier [OpenAI prompt cache](https://developers.openai.com/api/docs/guides/prompt-caching). Only responses explicitly reporting zero cached input tokens are accepted. Responses with cached tokens or missing cache usage are excluded from the comparison.
+
 Timing includes network and gateway overhead. A single run is not a benchmark or evidence of a general speed, cost, or accuracy advantage.
 
 ## Terminal and maintenance

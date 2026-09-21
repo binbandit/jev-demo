@@ -31,6 +31,12 @@ function completion(
     object: "chat.completion",
     created: 0,
     model: environment.OPENAI_MODEL,
+    usage: {
+      prompt_tokens: 256,
+      completion_tokens: 10,
+      total_tokens: 266,
+      prompt_tokens_details: { cached_tokens: 0 },
+    },
     choices: [
       {
         index: 0,
@@ -145,6 +151,48 @@ describe("OpenAI comparison request", () => {
       expect(result.answer).toEqual(answer);
       expect(result.response).toMatchObject(reply);
       expect(JSON.stringify(result)).not.toContain(environment.OPENAI_API_KEY);
+    },
+  );
+
+  test("repeated comparisons bypass gateway caching and use distinct prompt prefixes", async () => {
+    const { config, calls } = openAIReturning(completion('{"reason":"card_replacement"}'));
+    await runOpenAI(config, customerTask);
+    await runOpenAI(config, customerTask);
+
+    expect(calls).toHaveLength(2);
+    for (const call of calls) {
+      expect(call.headers.get("x-portkey-cache-force-refresh")).toBe("true");
+      expect(call.headers.get("cache-control")).toBe("no-store");
+      expect(call.body.prompt_cache_key).toEqual(expect.any(String));
+      expect(call.body.messages[0]?.content).toContain(call.body.prompt_cache_key ?? "missing");
+      expect(call.body.messages[1]).toEqual(calls[0]?.body.messages[1]);
+    }
+    expect(calls[0]?.body.prompt_cache_key).not.toBe(calls[1]?.body.prompt_cache_key);
+    expect(calls[0]?.body.messages[0]).not.toEqual(calls[1]?.body.messages[0]);
+  });
+
+  test.each([undefined, 0, 128])(
+    "only accepts uncached provider results (cached tokens: %s)",
+    async (cachedTokens) => {
+      const reply = completion('{"reason":"card_replacement"}');
+      reply.usage = {
+        prompt_tokens: 256,
+        completion_tokens: 10,
+        total_tokens: 266,
+        prompt_tokens_details: { cached_tokens: cachedTokens },
+      };
+      const { config } = openAIReturning(reply);
+      const jev = jevReturning();
+      const result = await compareModel(jev.client, config, input, "llm");
+      expect(result).toMatchObject(
+        cachedTokens !== 0
+          ? { llm: { ok: false, error: expect.stringContaining("This run was excluded") } }
+          : { llm: { ok: true } },
+      );
+      if (cachedTokens !== 0) {
+        expect(result).not.toHaveProperty("llm.elapsedMs");
+        expect(result).not.toHaveProperty("llm.result");
+      }
     },
   );
 
