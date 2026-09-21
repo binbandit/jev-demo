@@ -33,7 +33,7 @@ export function App() {
       <header className="header">
         <h1>jev-demo</h1>
         <span className="header-description">Typed judgments in TypeScript</span>
-        <a href="https://github.com/WastedHippie/jev-demo" target="_blank" rel="noreferrer">
+        <a href="https://github.com/binbandit/jev-demo" target="_blank" rel="noreferrer">
           GitHub
         </a>
       </header>
